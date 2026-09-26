@@ -94,13 +94,13 @@ class BytePairEncodingTokenizer:
 
 
 
-            # Use a simple range instead of enumerate since we just need adjacent indices
+            # adjacent indicies
             for i in range(len(sw) - 1):
                 x = (sw[i], sw[i + 1])
 
                 if len(x) > 1:
                     if x not in pair_count:
-                        pair_count[x] = [count, {idx}]  # Use a set to track word indices
+                        pair_count[x] = [count, {idx}] 
                     else:
                         pair_count[x][0] += count
                         pair_count[x][1].add(idx)
@@ -110,7 +110,7 @@ class BytePairEncodingTokenizer:
         for _ in tqdm(range(iterations)):
 
             if not pair_count:
-                break  # Break if there are no more pairs to merge
+                break  
 
             top_pair, meta = max(pair_count.items(), key=lambda x: x[1][0])
             freq, w_indices = meta[0], meta[1]
@@ -119,7 +119,6 @@ class BytePairEncodingTokenizer:
             suff_count = 0
             pref_count = 0
 
-            # Iterate over a list copy of the set, as the set may change
             for word_idx in list(w_indices):
                 word = self.i2w[word_idx]
                 count = self.tok_freq[word]
@@ -134,12 +133,10 @@ class BytePairEncodingTokenizer:
                     self.vocab['--' + new_char.replace('+', '')] = count
                     continue
 
-                # The dynamic scanning loop replacing the brittle index caching
                 i = 0
                 while i < len(sw) - 1:
                     if (sw[i], sw[i + 1]) == top_pair:
 
-                        # 1. Deduct counts for the old adjacent pairs that are destroyed by the merge
                         if i > 0:
                             x_left = (sw[i - 1], sw[i])
                             if x_left in pair_count:
@@ -154,10 +151,8 @@ class BytePairEncodingTokenizer:
                                 if pair_count[x_right][0] <= 0:
                                     del pair_count[x_right]
 
-                        # 2. MERGE the characters in the array
                         sw = sw[:i] + [new_char] + sw[i + 2:]
 
-                        # 3. Add counts for the NEW adjacent pairs formed by the merge
                         if i > 0:
                             x_left_new = (sw[i - 1], sw[i])
                             if x_left_new not in pair_count:
@@ -177,7 +172,6 @@ class BytePairEncodingTokenizer:
 
                 fin_sw[word] = sw
 
-                # Replicate your prefix and suffix counting on the newly merged word array
                 if len(sw) > 0:
                     if new_char == sw[0]:
                         pref_count += 1
@@ -187,9 +181,6 @@ class BytePairEncodingTokenizer:
                     if sw[0] == word:
                         del fin_sw[word]
                         self.vocab['--' + word.replace('+', '')] = count
-
-            # if new_char.replace("+", '') in self.base_akshar:
-            #     continue
 
 
             if pref_count > 0:
@@ -213,10 +204,6 @@ class BytePairEncodingTokenizer:
         self.i2w = {}
         all_toks = self.special_toks + ['--' + x for x in punctuation + '।'+'॥']
 
-        # not_pref = ['_aa', '_i', '_ee', '_u', '_oo', '_ri', '_ae', '_ai', '_o', '_aw', '_n', '_nn', '_aii', '_au']
-
-
-        # pref_base_akshar = ['--'+ x for x in self.base_akshar if x not in not_pref]
 
         all_toks = all_toks + list(self.vocab)
         self.i2w = {i: tok for i, tok in enumerate(all_toks)}
@@ -256,9 +243,7 @@ class BytePairEncodingTokenizer:
 
         word = "--" + word
 
-        subwords = {} # for storing all possible subwords
-
-        # get all possible subword sequences
+        subwords = {} 
 
 
 
@@ -275,11 +260,7 @@ class BytePairEncodingTokenizer:
                 else:
                     pass
 
-        subw = [] # storing different subword sequence
-
-        # keep only required subwords
-
-        # print(subwords)
+        subw = [] 
 
         for p in subwords:
 
@@ -386,11 +367,10 @@ class BytePairEncodingTokenizer:
             return self.subwords[word[2:]]
 
     def _split_oov_2(self, word):
-        # 0. Safety check for empty strings
+   
         if not word:
             return ""
 
-        # 1. Base cases (Quick returns)
         if word in self.special_toks:
             return word
 
@@ -405,7 +385,7 @@ class BytePairEncodingTokenizer:
         if word in string.punctuation:
             return word
 
-        # 2. Break the word into unbreakable phonetic atomic units
+
         units = self.split_chars(word)
         if not units:
             return ""
@@ -413,7 +393,6 @@ class BytePairEncodingTokenizer:
         subwords = []
         i = 0
 
-        # 3. Greedy Left-to-Right Longest Match
         while i < len(units):
 
             print
@@ -432,13 +411,10 @@ class BytePairEncodingTokenizer:
                     match_found = True
                     break
 
-            # 4. THE FIX: Output <unk> instead of the raw, unknown character
             if not match_found:
-                # We don't know this character. Force it to be the <unk> token.
                 subwords.append('<unk>')
                 i += 1
 
-        # 5. Cache and return the result
         final_output = ' '.join(subwords)
         self.subwords[word] = final_output
 
@@ -578,50 +554,6 @@ class BytePairEncodingTokenizer:
 
         return False
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-# text = ["""
-# walker walk playwalk player walking player walking playing""",
-# """walked walkplayed learned earned learning earn""",
-# """wished watching watched watcher watcher learns earns earning""",
-# """watches cares scares caring watched cared share !"""]
-#
-# # text = [
-# #     "खेलनेवाला खेल खिलाडी खेलता चलता चलते चलता खिलाडी खेलते",
-# #     "चला पढा पढाई पढाता पढते पढता सीखा सीखता सीखते सीख",
-# #     "देखनेवाला देखता देखा देखा देखते कमाता कमाते कमाया कमाना",
-# #     "देखता डरता डराता डरा डराते देखा बाँटता बाँटा बाँटते"
-# # ]
-#
-#
-# #
-# #
-# tok = BytePairEncodingTokenizer()
-# tok.load_tokenizer("tokenizer.pkl")
-
-# tok(text)
-
-# word = "capitalisation"
-#
-# try:
-#     del tok.subwords[word]
-#
-# except:
-#     pass
-#
-# # #
-# print(tok._split_oov(word))
 
 
 
